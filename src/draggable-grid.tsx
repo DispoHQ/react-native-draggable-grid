@@ -25,7 +25,7 @@ interface IBaseItemType {
 export interface IDraggableGridProps<DataType extends IBaseItemType> {
   numColumns: number
   data: DataType[]
-  renderItem: (item: DataType, order: number) => React.ReactElement<any>
+  renderItem: (item: DataType, order: number | undefined) => React.ReactElement<any>
   style?: ViewStyle
   itemHeight?: number
   dragStartAnimation?: StyleProp<any>
@@ -102,9 +102,9 @@ export const DraggableGrid = function<DataType extends IBaseItemType>(
       blockPositions[index] = getBlockPositionByOrder(index)
     })
   }
-  function getBlockPositionByOrder(order: number) {
+  function getBlockPositionByOrder(order: number): IPositionOffset {
     if (blockPositions[order]) {
-      return blockPositions[order]
+      return blockPositions[order]!
     }
     const columnOnRow = order % props.numColumns
     const y = blockHeight * Math.floor(order / props.numColumns)
@@ -119,14 +119,18 @@ export const DraggableGrid = function<DataType extends IBaseItemType>(
     gridHeight.setValue(rowCount * blockHeight)
   }
   function onBlockPress(itemIndex: number) {
-    props.onItemPress && props.onItemPress(items[itemIndex].itemData)
+    const item = items[itemIndex]?.itemData;
+    props.onItemPress && item && props.onItemPress(item)
   }
   function onStartDrag(_: GestureResponderEvent, gestureState: PanResponderGestureState) {
     const activeItem = getActiveItem()
     if (!activeItem) return false
     props.onDragStart && props.onDragStart(activeItem.itemData)
     const { x0, y0, moveX, moveY } = gestureState
-    const activeOrigin = blockPositions[orderMap[activeItem.key].order]
+    const order = orderMap[activeItem.key]?.order
+    if (!order) { return }
+    const activeOrigin = blockPositions[order]
+    if (!activeOrigin) { return }
     const x = activeOrigin.x - x0
     const y = activeOrigin.y - y0
     activeItem.currentPosition.setOffset({
@@ -141,8 +145,10 @@ export const DraggableGrid = function<DataType extends IBaseItemType>(
       x: moveX,
       y: moveY,
     })
+    return true
   }
-  function onHandMove(_: GestureResponderEvent, gestureState: PanResponderGestureState) {
+
+  function onHandMove(_: GestureResponderEvent, gestureState: PanResponderGestureState): boolean {
     const activeItem = getActiveItem()
     if (!activeItem) return false
     const { moveX, moveY } = gestureState
@@ -155,7 +161,10 @@ export const DraggableGrid = function<DataType extends IBaseItemType>(
       x: moveX - xChokeAmount - xMinChokeAmount,
       y: moveY,
     }
-    const originPosition = blockPositions[orderMap[activeItem.key].order]
+    const order = orderMap[activeItem.key]?.order
+    if (!order) { return false }
+    const originPosition = blockPositions[order]
+    if (!originPosition) { return false }
     const dragPositionToActivePositionDistance = getDistance(dragPosition, originPosition)
     activeItem.currentPosition.setValue(dragPosition)
 
@@ -165,9 +174,13 @@ export const DraggableGrid = function<DataType extends IBaseItemType>(
     items.forEach((item, index) => {
       if (item.itemData.disabledReSorted) return
       if (index != activeItemIndex) {
+        const itemOrder = orderMap[item.key]?.order
+        if (!itemOrder) { return }
+        const itemPosition = blockPositions[itemOrder];
+        if (!itemPosition) { return }
         const dragPositionToItemPositionDistance = getDistance(
           dragPosition,
-          blockPositions[orderMap[item.key].order],
+          itemPosition,
         )
         if (
           dragPositionToItemPositionDistance < closetDistance &&
@@ -179,13 +192,20 @@ export const DraggableGrid = function<DataType extends IBaseItemType>(
       }
     })
     if (activeItemIndex != closetItemIndex) {
-      const closetOrder = orderMap[items[closetItemIndex].key].order
-      resetBlockPositionByOrder(orderMap[activeItem.key].order, closetOrder)
-      orderMap[activeItem.key].order = closetOrder
+      const closetKey = items[closetItemIndex]?.key
+      if (!closetKey) { return false }
+      const closetOrder = orderMap[closetKey]?.order
+      if (!closetOrder) { return false }
+      const activeOrder = orderMap[activeItem.key]
+      if (!activeOrder) { return false }
+      resetBlockPositionByOrder(activeOrder.order, closetOrder)
+      activeOrder.order = closetOrder
       props.onResetSort && props.onResetSort(getSortData())
     }
+    return true
   }
-  function onHandRelease() {
+
+  function onHandRelease(): boolean {
     const activeItem = getActiveItem()
     if (!activeItem) return false
     props.onDragRelease && props.onDragRelease(getSortData())
@@ -193,7 +213,9 @@ export const DraggableGrid = function<DataType extends IBaseItemType>(
     activeItem.currentPosition.flattenOffset()
     moveBlockToBlockOrderPosition(activeItem.key)
     setActiveItemIndex(undefined)
+    return true
   }
+
   function resetBlockPositionByOrder(activeItemOrder: number, insertedPositionOrder: number) {
     let disabledReSortedItemCount = 0
     if (activeItemOrder > insertedPositionOrder) {
@@ -203,9 +225,12 @@ export const DraggableGrid = function<DataType extends IBaseItemType>(
         if (item && item.disabledReSorted) {
           disabledReSortedItemCount++
         } else {
-          orderMap[key].order += disabledReSortedItemCount + 1
-          disabledReSortedItemCount = 0
-          moveBlockToBlockOrderPosition(key)
+          const itemOrder = orderMap[key];
+          if (itemOrder) {
+            itemOrder.order += disabledReSortedItemCount + 1
+            disabledReSortedItemCount = 0
+            moveBlockToBlockOrderPosition(key)
+          }
         }
       }
     } else {
@@ -215,18 +240,25 @@ export const DraggableGrid = function<DataType extends IBaseItemType>(
         if (item && item.disabledReSorted) {
           disabledReSortedItemCount++
         } else {
-          orderMap[key].order -= disabledReSortedItemCount + 1
-          disabledReSortedItemCount = 0
-          moveBlockToBlockOrderPosition(key)
+          const itemOrder = orderMap[key];
+          if (itemOrder) {
+            itemOrder.order -= disabledReSortedItemCount + 1
+            disabledReSortedItemCount = 0
+            moveBlockToBlockOrderPosition(key)
+          }
         }
       }
     }
   }
   function moveBlockToBlockOrderPosition(itemKey: string | number) {
     const itemIndex = findIndex(items, item => `${item.key}` === `${itemKey}`)
-    items[itemIndex].currentPosition.flattenOffset()
-    Animated.timing(items[itemIndex].currentPosition, {
-      toValue: blockPositions[orderMap[itemKey].order],
+    const item = items[itemIndex]
+    if (!item) { return }
+    const itemOrder = orderMap[itemKey]?.order
+    if (!itemOrder) { return }
+    item.currentPosition.flattenOffset()
+    Animated.timing(item.currentPosition, {
+      toValue: blockPositions[itemOrder] ?? { x: 0, y: 0},
       duration: 200,
       useNativeDriver: false,
     }).start()
@@ -238,7 +270,10 @@ export const DraggableGrid = function<DataType extends IBaseItemType>(
   function getSortData() {
     const sortData: DataType[] = []
     items.forEach(item => {
-      sortData[orderMap[item.key].order] = item.itemData
+      const itemOrder = orderMap[item.key]?.order
+      if (itemOrder) {
+        sortData[itemOrder] = item.itemData
+      }
     })
     return sortData
   }
@@ -264,17 +299,18 @@ export const DraggableGrid = function<DataType extends IBaseItemType>(
     }
   }
   function getBlockStyle(itemIndex: number) {
+    const item = items[itemIndex]
     return [
       {
         justifyContent: 'center',
         alignItems: 'center',
       },
-      hadInitBlockSize && {
+      hadInitBlockSize && item && {
         width: blockWidth,
         height: blockHeight,
         position: 'absolute',
-        top: items[itemIndex].currentPosition.getLayout().top,
-        left: items[itemIndex].currentPosition.getLayout().left,
+        top: item.currentPosition.getLayout()['top'],
+        left: item.currentPosition.getLayout()['left'],
       },
     ]
   }
@@ -330,9 +366,10 @@ export const DraggableGrid = function<DataType extends IBaseItemType>(
   }
   function diffData() {
     props.data.forEach((item, index) => {
-      if (orderMap[item.key]) {
-        if (orderMap[item.key].order != index) {
-          orderMap[item.key].order = index
+      const itemOrder = orderMap[item.key]
+      if (itemOrder) {
+        if (itemOrder.order != index) {
+          itemOrder.order = index
           moveBlockToBlockOrderPosition(item.key)
         }
         const currentItem = items.find(i => i.key === item.key)
@@ -373,7 +410,7 @@ export const DraggableGrid = function<DataType extends IBaseItemType>(
         dragStartAnimationStyle={getDragStartAnimation(itemIndex)}
         delayLongPress={props.delayLongPress || 300}
         key={item.key}>
-        {props.renderItem(item.itemData, orderMap[item.key].order)}
+        {props.renderItem(item.itemData, orderMap[item.key]?.order)}
       </Block>
     )
   })
