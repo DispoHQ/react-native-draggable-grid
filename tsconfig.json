@@ -8,7 +8,6 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "node",
     "allowUnusedLabels": false,
     "allowUnreachableCode": false,
     "noFallthroughCasesInSwitch": true,
@@ -21,7 +20,7 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "outDir": "built",
-    "sourceMap": true,
+    "sourceMap": true
   },
   "exclude": ["node_modules", "demo"]
 }
