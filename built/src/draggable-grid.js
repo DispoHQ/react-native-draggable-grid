@@ -1,4 +1,5 @@
 "use strict";
+/** @format */
 var __assign = (this && this.__assign) || function () {
     __assign = Object.assign || function(t) {
         for (var s, i = 1, n = arguments.length; i < n; i++) {
@@ -102,25 +103,15 @@ var DraggableGrid = function (props) {
         gridHeight.setValue(rowCount * blockHeight);
     }
     function onBlockPress(itemIndex) {
-        var _a;
-        var item = (_a = items[itemIndex]) === null || _a === void 0 ? void 0 : _a.itemData;
-        props.onItemPress && item && props.onItemPress(item);
+        props.onItemPress && props.onItemPress(items[itemIndex].itemData);
     }
     function onStartDrag(_, gestureState) {
-        var _a;
         var activeItem = getActiveItem();
         if (!activeItem)
             return false;
         props.onDragStart && props.onDragStart(activeItem.itemData);
         var x0 = gestureState.x0, y0 = gestureState.y0, moveX = gestureState.moveX, moveY = gestureState.moveY;
-        var order = (_a = orderMap[activeItem.key]) === null || _a === void 0 ? void 0 : _a.order;
-        if (!order) {
-            return;
-        }
-        var activeOrigin = blockPositions[order];
-        if (!activeOrigin) {
-            return;
-        }
+        var activeOrigin = blockPositions[orderMap[activeItem.key].order];
         var x = activeOrigin.x - x0;
         var y = activeOrigin.y - y0;
         activeItem.currentPosition.setOffset({
@@ -138,7 +129,6 @@ var DraggableGrid = function (props) {
         return true;
     }
     function onHandMove(_, gestureState) {
-        var _a, _b, _c;
         var activeItem = getActiveItem();
         if (!activeItem)
             return false;
@@ -150,32 +140,16 @@ var DraggableGrid = function (props) {
             x: moveX - xChokeAmount - xMinChokeAmount,
             y: moveY,
         };
-        var order = (_a = orderMap[activeItem.key]) === null || _a === void 0 ? void 0 : _a.order;
-        if (!order) {
-            return false;
-        }
-        var originPosition = blockPositions[order];
-        if (!originPosition) {
-            return false;
-        }
+        var originPosition = blockPositions[orderMap[activeItem.key].order];
         var dragPositionToActivePositionDistance = getDistance(dragPosition, originPosition);
         activeItem.currentPosition.setValue(dragPosition);
         var closetItemIndex = activeItemIndex;
         var closetDistance = dragPositionToActivePositionDistance;
         items.forEach(function (item, index) {
-            var _a;
             if (item.itemData.disabledReSorted)
                 return;
             if (index != activeItemIndex) {
-                var itemOrder = (_a = orderMap[item.key]) === null || _a === void 0 ? void 0 : _a.order;
-                if (!itemOrder) {
-                    return;
-                }
-                var itemPosition = blockPositions[itemOrder];
-                if (!itemPosition) {
-                    return;
-                }
-                var dragPositionToItemPositionDistance = getDistance(dragPosition, itemPosition);
+                var dragPositionToItemPositionDistance = getDistance(dragPosition, blockPositions[orderMap[item.key].order]);
                 if (dragPositionToItemPositionDistance < closetDistance &&
                     dragPositionToItemPositionDistance < blockWidth) {
                     closetItemIndex = index;
@@ -184,20 +158,9 @@ var DraggableGrid = function (props) {
             }
         });
         if (activeItemIndex != closetItemIndex) {
-            var closetKey = (_b = items[closetItemIndex]) === null || _b === void 0 ? void 0 : _b.key;
-            if (!closetKey) {
-                return false;
-            }
-            var closetOrder = (_c = orderMap[closetKey]) === null || _c === void 0 ? void 0 : _c.order;
-            if (!closetOrder) {
-                return false;
-            }
-            var activeOrder = orderMap[activeItem.key];
-            if (!activeOrder) {
-                return false;
-            }
-            resetBlockPositionByOrder(activeOrder.order, closetOrder);
-            activeOrder.order = closetOrder;
+            var closetOrder = orderMap[items[closetItemIndex].key].order;
+            resetBlockPositionByOrder(orderMap[activeItem.key].order, closetOrder);
+            orderMap[activeItem.key].order = closetOrder;
             props.onResetSort && props.onResetSort(getSortData());
         }
         return true;
@@ -223,12 +186,9 @@ var DraggableGrid = function (props) {
                     disabledReSortedItemCount++;
                 }
                 else {
-                    var itemOrder = orderMap[key];
-                    if (itemOrder) {
-                        itemOrder.order += disabledReSortedItemCount + 1;
-                        disabledReSortedItemCount = 0;
-                        moveBlockToBlockOrderPosition(key);
-                    }
+                    orderMap[key].order += disabledReSortedItemCount + 1;
+                    disabledReSortedItemCount = 0;
+                    moveBlockToBlockOrderPosition(key);
                 }
             }
         }
@@ -240,30 +200,18 @@ var DraggableGrid = function (props) {
                     disabledReSortedItemCount++;
                 }
                 else {
-                    var itemOrder = orderMap[key];
-                    if (itemOrder) {
-                        itemOrder.order -= disabledReSortedItemCount + 1;
-                        disabledReSortedItemCount = 0;
-                        moveBlockToBlockOrderPosition(key);
-                    }
+                    orderMap[key].order -= disabledReSortedItemCount + 1;
+                    disabledReSortedItemCount = 0;
+                    moveBlockToBlockOrderPosition(key);
                 }
             }
         }
     }
     function moveBlockToBlockOrderPosition(itemKey) {
-        var _a, _b;
         var itemIndex = (0, utils_1.findIndex)(items, function (item) { return "".concat(item.key) === "".concat(itemKey); });
-        var item = items[itemIndex];
-        if (!item) {
-            return;
-        }
-        var itemOrder = (_a = orderMap[itemKey]) === null || _a === void 0 ? void 0 : _a.order;
-        if (!itemOrder) {
-            return;
-        }
-        item.currentPosition.flattenOffset();
-        react_native_1.Animated.timing(item.currentPosition, {
-            toValue: (_b = blockPositions[itemOrder]) !== null && _b !== void 0 ? _b : { x: 0, y: 0 },
+        items[itemIndex].currentPosition.flattenOffset();
+        react_native_1.Animated.timing(items[itemIndex].currentPosition, {
+            toValue: blockPositions[orderMap[itemKey].order],
             duration: 200,
             useNativeDriver: false,
         }).start();
@@ -274,11 +222,7 @@ var DraggableGrid = function (props) {
     function getSortData() {
         var sortData = [];
         items.forEach(function (item) {
-            var _a;
-            var itemOrder = (_a = orderMap[item.key]) === null || _a === void 0 ? void 0 : _a.order;
-            if (itemOrder) {
-                sortData[itemOrder] = item.itemData;
-            }
+            sortData[orderMap[item.key].order] = item.itemData;
         });
         return sortData;
     }
@@ -304,18 +248,17 @@ var DraggableGrid = function (props) {
         }
     }
     function getBlockStyle(itemIndex) {
-        var item = items[itemIndex];
         return [
             {
                 justifyContent: 'center',
                 alignItems: 'center',
             },
-            hadInitBlockSize && item && {
+            hadInitBlockSize && {
                 width: blockWidth,
                 height: blockHeight,
                 position: 'absolute',
-                top: item.currentPosition.getLayout()['top'],
-                left: item.currentPosition.getLayout()['left'],
+                top: items[itemIndex].currentPosition.getLayout()['top'],
+                left: items[itemIndex].currentPosition.getLayout()['left'],
             },
         ];
     }
@@ -367,10 +310,9 @@ var DraggableGrid = function (props) {
     }
     function diffData() {
         props.data.forEach(function (item, index) {
-            var itemOrder = orderMap[item.key];
-            if (itemOrder) {
-                if (itemOrder.order != index) {
-                    itemOrder.order = index;
+            if (orderMap[item.key]) {
+                if (orderMap[item.key].order != index) {
+                    orderMap[item.key].order = index;
                     moveBlockToBlockOrderPosition(item.key);
                 }
                 var currentItem = items.find(function (i) { return i.key === item.key; });
@@ -403,9 +345,8 @@ var DraggableGrid = function (props) {
         diffData();
     }
     var itemList = items.map(function (item, itemIndex) {
-        var _a;
         return (<block_1.Block onPress={onBlockPress.bind(null, itemIndex)} onLongPress={setActiveBlock.bind(null, itemIndex, item.itemData)} panHandlers={panResponder.panHandlers} style={getBlockStyle(itemIndex)} dragStartAnimationStyle={getDragStartAnimation(itemIndex)} delayLongPress={props.delayLongPress || 300} key={item.key}>
-        {props.renderItem(item.itemData, (_a = orderMap[item.key]) === null || _a === void 0 ? void 0 : _a.order)}
+        {props.renderItem(item.itemData, orderMap[item.key].order)}
       </block_1.Block>);
     });
     return (<react_native_1.Animated.View style={[
